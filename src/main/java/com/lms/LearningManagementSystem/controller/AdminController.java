@@ -22,7 +22,7 @@ public class AdminController {
     @Autowired
     private CourseService courseService;
     //dfmnsdfnjksdnfjksdnfjsdnjkfnsdjfs
-
+    //ldmflnsdflsnlfnsdlnfsl
     @GetMapping("/users")
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
