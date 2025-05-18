@@ -20,7 +20,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "${app.cors.allowed-origins}", allowCredentials = "true")
 public class AuthController {
 
     @Autowired
@@ -31,11 +31,23 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@RequestBody User user) {
-        System.out.println("Register endpoint accessed: " + user.getUsername());
+        // Remove password logging
+        //System.out.println("Register endpoint accessed: " + user.getUsername());
         try {
+            // Create a copy of the user for the response to avoid modifying the original
             User registeredUser = userService.createUser(user);
-            registeredUser.setPassword(null);
-            return ResponseEntity.ok(registeredUser);
+
+            // Create a clean response object instead of modifying the original user
+            Map<String, Object> userResponse = new HashMap<>();
+            userResponse.put("id", registeredUser.getId());
+            userResponse.put("username", registeredUser.getUsername());
+            userResponse.put("firstName", registeredUser.getFirstName());
+            userResponse.put("lastName", registeredUser.getLastName());
+            userResponse.put("email", registeredUser.getEmail());
+            userResponse.put("role", registeredUser.getRole());
+
+            //registeredUser.setPassword(null);
+            return ResponseEntity.ok(userResponse);
         } catch (IllegalArgumentException e) {
             Map<String, String> response = new HashMap<>();
             response.put("error", e.getMessage());
@@ -60,10 +72,14 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             session.setAttribute("SPRING_SECURITY_CONTEXT", SecurityContextHolder.getContext());
 
+            // Set session timeout (30 minutes)
+            session.setMaxInactiveInterval(1800);
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "User logged in successfully");
             response.put("username", loginRequest.getUsername());
             response.put("role", authentication.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
+
 
             return ResponseEntity.ok(response);
         } catch (BadCredentialsException e) {
@@ -71,8 +87,11 @@ public class AuthController {
             response.put("error", "Invalid username or password");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
         } catch (Exception e) {
+            // Don't expose detailed error messages in production
             Map<String, String> response = new HashMap<>();
-            response.put("error", "An unexpected error occurred: " + e.getMessage());
+            response.put("error", "Authentication failed");
+            // Log the actual error for debugging but don't return it to client
+            System.err.println("Login error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
@@ -84,6 +103,21 @@ public class AuthController {
         Map<String, String> response = new HashMap<>();
         response.put("message", "Logged out successfully");
         return ResponseEntity.ok(response);
+    }
+    // Add a method to check if a user is authenticated
+    @GetMapping("/authenticated")
+    public ResponseEntity<?> isAuthenticated(Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("authenticated", true);
+            response.put("username", authentication.getName());
+            response.put("role", authentication.getAuthorities().iterator().next().getAuthority().replace("ROLE_", ""));
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("authenticated", false);
+            return ResponseEntity.ok(response);
+        }
     }
 
     @Setter
